@@ -1,0 +1,64 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "PayAPI", "version": "v1 (2025-03-01)" },
+  "paths": {
+    "/v1/charges": {
+      "post": {
+        "responses": {
+          "200": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string", "enum": ["pending", "succeeded", "failed"] },
+                "billing_details": {
+                  "type": "object",
+                  "properties": {
+                    "address": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/charges/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string", "enum": ["pending", "succeeded", "failed"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/refunds": {
+      "post": {
+        "requestBody": {
+          "required": ["charge", "amount"],
+          "properties": {
+            "charge": { "type": "string" },
+            "amount": { "type": "number" }
+          }
+        },
+        "responses": {
+          "200": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

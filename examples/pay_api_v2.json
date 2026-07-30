@@ -1,0 +1,85 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "PayAPI", "version": "v2 (2026-07-01.dahlia)" },
+  "x-migrations": {
+    "endpoints": {
+      "GET /v1/charges/{id}": "GET /v1/payments/{id}"
+    },
+    "enums": {
+      "status": { "pending": "processing" }
+    },
+    "fields": {
+      "billing_details.address": { "shape": "object", "formatter": "formatAddress" }
+    },
+    "defaults": {
+      "POST /v1/refunds": { "reason": "requested_by_customer" }
+    }
+  },
+  "paths": {
+    "/v1/charges": {
+      "post": {
+        "responses": {
+          "200": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string", "enum": ["processing", "succeeded", "failed"] },
+                "billing_details": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "object",
+                      "properties": {
+                        "line1": { "type": "string" },
+                        "city": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payments/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string", "enum": ["processing", "succeeded", "failed"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/refunds": {
+      "post": {
+        "requestBody": {
+          "required": ["charge", "amount", "reason"],
+          "properties": {
+            "charge": { "type": "string" },
+            "amount": { "type": "number" },
+            "reason": { "type": "string" }
+          }
+        },
+        "responses": {
+          "200": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
