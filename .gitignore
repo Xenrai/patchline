@@ -5,3 +5,4 @@ build/
 .diff.json
 diff.json
 sites.json
+examples/stripe/spec3_*.json

@@ -1,0 +1,50 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e .
+      - run: python -m unittest discover tests -v
+
+      # The demo must always work exactly as the README documents it.
+      # (exit code 1 = breaking changes found, which is the expected result here)
+      - name: toy example produces documented output
+        run: |
+          set +e
+          patchline diff examples/pay_api_v1.json examples/pay_api_v2.json --out diff.json
+          test $? -eq 1 || exit 1
+          patchline scan --repo examples/consumer --report diff.json
+          test $? -eq 1 || exit 1
+          set -e
+
+      # The committed Stripe report must keep matching the published numbers.
+      - name: committed stripe report is consistent
+        run: python -m unittest tests.test_spec_diff.TestRealStripeReport -v
+
+  stripe-diff:
+    # Weekly: re-run the real-spec diff so bit-rot in the reproducibility
+    # script (or a Stripe re-tag) shows up here, not in a visitor's terminal.
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - run: python examples/stripe/run_stripe_diff.py
