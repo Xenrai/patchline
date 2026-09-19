@@ -9,9 +9,10 @@ on:
 
 jobs:
   unit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
@@ -20,10 +21,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e .
       - run: python -m unittest discover tests -v
+      - name: build installable wheel
+        run: python -m pip wheel . --no-deps --wheel-dir dist
 
       # The demo must always work exactly as the README documents it.
       # (exit code 1 = breaking changes found, which is the expected result here)
       - name: toy example produces documented output
+        shell: bash
         run: |
           set +e
           patchline diff examples/pay_api_v1.json examples/pay_api_v2.json --out diff.json

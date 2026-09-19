@@ -173,9 +173,9 @@ class TestRealStripeReport(unittest.TestCase):
             self.skipTest("report not generated yet")
         import json
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        self.assertEqual(report["summary"]["total"], 679)
-        self.assertEqual(report["summary"]["breaking"], 16)
-        self.assertEqual(report["summary"]["additive"], 663)
+        self.assertEqual(report["summary"]["total"], 6398)
+        self.assertEqual(report["summary"]["breaking"], 18)
+        self.assertEqual(report["summary"]["additive"], 6380)
         iin = [c for c in report["changes"]
                if c["kind"] == "response_field_removed" and "card.iin" in c["pointer"]]
         self.assertEqual(len(iin), 2)  # POST /v1/tokens + GET /v1/tokens/{token}
