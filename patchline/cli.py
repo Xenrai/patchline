@@ -40,7 +40,22 @@ def _cmd_diff(args):
 def _cmd_scan(args):
     with open(args.report, "r", encoding="utf-8") as f:
         report = json.load(f)
-    changes = [Change(**c) for c in report["changes"]]
+    if not isinstance(report, dict) or not isinstance(report.get("changes"), list):
+        raise ValueError("report must contain a 'changes' array")
+    changes = []
+    for i, row in enumerate(report["changes"]):
+        if not isinstance(row, dict):
+            raise ValueError(f"change {i} must be an object")
+        try:
+            change = Change(**row)
+        except TypeError as exc:
+            raise ValueError(f"invalid change {i}: {exc}") from exc
+        for field in ("kind", "severity", "path", "method", "detail", "pointer"):
+            if not isinstance(getattr(change, field), str):
+                raise ValueError(f"change {i} field '{field}' must be a string")
+        if change.severity not in ("BREAKING", "ADDITIVE"):
+            raise ValueError(f"change {i} has invalid severity")
+        changes.append(change)
     sites = scan_repo(args.repo, changes)
     breaking = [c for c in changes if c.severity == "BREAKING"]
     print(f"{len(breaking)} breaking changes -> {len(sites)} affected call site(s) in {args.repo}")
@@ -73,7 +88,11 @@ def main(argv=None):
     s.set_defaults(fn=_cmd_scan)
 
     args = parser.parse_args(argv)
-    return args.fn(args)
+    try:
+        return args.fn(args)
+    except (OSError, ValueError, UnicodeError) as exc:
+        print(f"patchline: error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

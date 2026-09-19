@@ -1,7 +1,7 @@
 # patchline
 
-Diff two OpenAPI specs, classify every change as breaking or additive, and map
-the breaking ones to the exact call sites in your codebase (file:line).
+Diff two OpenAPI specs, classify supported changes as breaking or additive, and map
+the breaking ones to the potentially affected call sites in your codebase (file:line).
 
 Python 3.10+, zero dependencies, no network access, no LLM calls. MIT.
 
@@ -20,10 +20,13 @@ release tags `v2250` (2026-04-22.dahlia) → `v2349` (2026-07-29.dahlia), ~8 MB 
 
 | | |
 |---|---|
-| Total changes | **679** |
-| Breaking | **16** |
-| Additive | 663 |
-| Runtime of the diff itself | ~0.5 s |
+| Total changes | **6,398** |
+| Breaking | **18** |
+| Additive | 6,380 |
+
+These v0.2 totals include array items and all response representations; they replace
+the v0.1 totals of 679 changes (16 breaking). Findings are contract differences,
+not a count of independent production failures.
 
 The breaking set (full report: [`examples/stripe/stripe-diff-report.json`](examples/stripe/stripe-diff-report.json)):
 
@@ -32,6 +35,9 @@ The breaking set (full report: [`examples/stripe/stripe-diff-report.json`](examp
   routing compiles fine and dies at runtime.
 - **`iin` removed from `GET /v1/customers/{customer}/cards/{id}`** — same field,
   second surface.
+- **`data[].iin` removed** from the customer card list response, previously
+  missed because it is inside an array.
+- **Root response type changed** on the terminal reader cancel action.
 - **13 fields removed from `POST /v1/terminal/readers/{reader}/cancel_action`** —
   the response object was restructured; every property a client might read
   (`serial_number`, `status`, `ip_address`, …) is gone.
@@ -42,7 +48,7 @@ Reproduce:
 pip install -e .
 python examples/stripe/run_stripe_diff.py
 # downloads the two pinned specs (~16 MB), runs the diff, checks the numbers:
-# expected {'total': 679, 'breaking': 16, 'additive': 663} -> MATCH
+# expected {'total': 6398, 'breaking': 18, 'additive': 6380} -> MATCH
 ```
 
 ## Install
@@ -67,8 +73,8 @@ Real output of step 2:
 4 breaking changes -> 7 affected call site(s) in examples/consumer
 
   billing.js:2     [endpoint_removed] const CHARGE_URL = (id) => `/v1/charges/${id}`;
-  billing.js:13    [response_type_changed] return charge.billing_details.address.split(",")[1].trim();
   billing.js:9     [enum_value_removed] return charge.status === "pending";
+  billing.js:13    [response_type_changed] return charge.billing_details.address.split(",")[1].trim();
   mockClient.js:19    [request_required_added] if (path === "/v1/refunds") {
   refunds.js:3     [request_required_added] return client.post("/v1/refunds", { charge: chargeId, amount });
   test.js:5     [request_required_added] const refunds = require("./refunds");
@@ -76,7 +82,9 @@ Real output of step 2:
 ```
 
 Both commands exit `1` when breaking changes / affected call sites are found
-and `0` when clean, so they drop into CI as a dependency-drift gate.
+and `0` when no supported findings are detected. Invalid input, missing folders,
+unreadable files, and output-write failures exit `2` with an error on stderr.
+Use these distinct codes in CI; a scan with zero matches does not prove compatibility.
 
 ## What it detects
 
@@ -87,44 +95,57 @@ and `0` when clean, so they drop into CI as a dependency-drift gate.
 | Response type changed | BREAKING | `address`: string → object |
 | Enum value removed | BREAKING | `status: "pending"` retired |
 | Required request field added | BREAKING | `reason` now mandatory |
-| Endpoint / field added | additive | informational |
+| Required body / parameter added | BREAKING | a header or body becomes mandatory |
+| Response / media type removed | BREAKING | `201` or a content representation removed |
+| Request media type removed | BREAKING | form encoding no longer accepted |
+| Endpoint / response / field added | additive | informational |
 
-Spec support: OpenAPI 3 `content` wrappers, local `$ref` resolution
-(cycle- and depth-guarded), JSON and form-encoded request bodies. The Stripe
-specs exercise all of this — they are ~8 MB of `$ref`s.
+Spec support: JSON OpenAPI documents, all eight HTTP methods, every response
+status (including `default` and status ranges), separate media representations,
+local `$ref` resolution with escaped JSON Pointer tokens, array items, root
+response types, nullable types, and required top-level request fields across
+content types. Path-level parameters are inherited, with operation-level overrides.
+Broken or external references encountered during comparison produce an error.
 
 ## How it works
 
-- `patchline/spec_diff.py` — walks both specs, flattens response schemas to
-  `dotted.path -> type` maps (depth-capped), and diffs operations, properties,
-  enums, and required request fields. Deterministic; same inputs, same report.
-- `patchline/scanner.py` — for each breaking change, generates regexes from
-  the change kind (path literals incl. template params, dotted field access,
-  enum string literals) and greps the consumer repo line by line.
-- `patchline/cli.py` — `diff` and `scan` subcommands, JSON reports, CI exit codes.
+- `patchline/spec_diff.py` compares operations and response representations,
+  walks nested properties and array items, and checks request requirements.
+- `patchline/scanner.py` matches endpoint literals, dotted/bracket field access,
+  and enum literals against source files. Patterns are compiled once per scan.
+- `patchline/cli.py` provides `diff` and `scan`, JSON report files, and CI exit codes.
+
+Scan results are sorted by file and line. Supported extensions are `.js`, `.ts`,
+`.jsx`, `.tsx`, `.mjs`, `.cjs`, and `.py`. Dependency, build, cache, and Git folders
+are excluded (`node_modules`, `.venv`, `venv`, `dist`, `build`, `__pycache__`, `.git`).
+Symlinks are skipped. Source files must be UTF-8; unreadable source produces an error.
 
 ## Limitations
 
-- The scanner is a pattern heuristic, not an AST. It catches the common cases
-  (path literals, `.field` access, enum comparisons) and it will both miss
-  obfuscated call sites and flag occasional false positives. The pointer and
-  matched line are always printed so you can judge each hit.
-- Only the `200` response schema is compared.
-- Response schemas are flattened 5 levels deep (`MAX_DEPTH`).
-- Scanner targets JS/TS files (`.js`, `.ts`, `.jsx`, `.tsx`).
-
-These are v1 trade-offs, not invisible failure modes — contributions that
-close them are the most valuable ones.
+- This is a pattern scanner, not an AST or data-flow analyzer. It can both miss
+  affected call sites and flag unrelated code. Review the matched file and line.
+- Schema traversal is capped at five levels. Composition (`allOf`, `oneOf`,
+  `anyOf`), discriminators, arbitrary additional properties, and full JSON Schema
+  constraint compatibility are not analyzed.
+- Request checking covers top-level required properties, required bodies and
+  parameters, and removed media types. It does not compare nested request
+  requirements, parameter types, authentication, or validation bounds.
+- YAML, external references, callbacks, and webhooks are unsupported. Convert or
+  bundle specs into JSON with local references first.
+- Validation checks supported input shapes; it is not a complete OpenAPI validator.
+- Response enum removals retain the original conservative breaking classification;
+  enum additions are not reported. A type change is conservatively breaking.
 
 ## Tests
 
 ```bash
-python -m unittest discover tests -v    # 19 tests, stdlib only
+python -m unittest discover tests -v
 ```
 
-CI runs the unit tests, re-runs the toy example exactly as documented above,
-and validates the committed Stripe report against the published numbers. A
-weekly job re-runs the real-spec diff from scratch.
+Tests cover original fixtures, response variants, arrays, references, request
+requirements, scanner exclusions, input failures, and end-to-end CLI exit codes.
+The weekly workflow reruns the pinned Stripe comparison. Package discovery is
+explicit so installation includes only `patchline`, not fixtures or tests.
 
 ## Open source vs. commercial
 

@@ -7,8 +7,8 @@ JSON report next to this script.
 Usage:
     python examples/stripe/run_stripe_diff.py
 
-Expected output (verified 2026-08-01):
-    679 changes: 16 BREAKING, 663 additive
+Expected output (v0.2, verified 2026-09-19):
+    6398 changes: 18 BREAKING, 6380 additive
 
 The report committed at examples/stripe/stripe-diff-report.json was produced
 by exactly this script. If Stripe re-tags a release the numbers can shift;
@@ -29,7 +29,7 @@ SPECS = {
     "v2349": "https://raw.githubusercontent.com/stripe/openapi/v2349/openapi/spec3.json",
 }
 
-EXPECTED = {"total": 679, "breaking": 16, "additive": 663}
+EXPECTED = {"total": 6398, "breaking": 18, "additive": 6380}
 
 
 def fetch(tag: str) -> Path:
