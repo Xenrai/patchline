@@ -7,8 +7,8 @@ JSON report next to this script.
 Usage:
     python examples/stripe/run_stripe_diff.py
 
-Expected output (v0.2, verified 2026-09-19):
-    6398 changes: 18 BREAKING, 6380 additive
+Expected output (v0.3, verified 2026-09-19):
+    6385 changes: 4 BREAKING, 1 review, 6380 additive
 
 The report committed at examples/stripe/stripe-diff-report.json was produced
 by exactly this script. If Stripe re-tags a release the numbers can shift;
@@ -29,7 +29,7 @@ SPECS = {
     "v2349": "https://raw.githubusercontent.com/stripe/openapi/v2349/openapi/spec3.json",
 }
 
-EXPECTED = {"total": 6398, "breaking": 18, "additive": 6380}
+EXPECTED = {"total": 6385, "breaking": 4, "review": 1, "additive": 6380}
 
 
 def fetch(tag: str) -> Path:
@@ -47,7 +47,7 @@ def main() -> int:
     changes = diff_specs(old, new)
     s = summarize(changes)
     print(f"Stripe API: {old['info']['version']} -> {new['info']['version']}")
-    print(f"{s['total']} changes: {s['breaking']} BREAKING, {s['additive']} additive")
+    print(f"{s['total']} changes: {s['breaking']} BREAKING, {s['review']} review, {s['additive']} additive")
 
     report = {
         "api": old["info"]["title"],
@@ -61,10 +61,10 @@ def main() -> int:
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"full report -> {out}")
 
-    breaking = [c for c in changes if c.severity == "BREAKING"]
-    print("\nbreaking changes:")
+    breaking = [c for c in changes if c.severity in ("BREAKING", "REVIEW")]
+    print("\nbreaking changes and manual reviews:")
     for c in breaking:
-        print(f"  {c.method.upper():5s} {c.path:55s} {c.detail}")
+        print(f"  [{c.severity}] {c.method.upper():5s} {c.path:55s} {c.detail}")
 
     ok = all(s[k] == v for k, v in EXPECTED.items())
     print(f"\nexpected {EXPECTED} -> {'MATCH' if ok else 'MISMATCH'}")

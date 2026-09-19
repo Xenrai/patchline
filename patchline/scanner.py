@@ -4,8 +4,7 @@ v1 approach: pattern-based static scan (honest heuristic, documented as such).
 Each change kind carries search patterns; we grep the consumer repo line by
 line and record (file, line, matched_text, change_pointer).
 
-In production this layer is an agent with full AST + type information; the
-pattern scan is the deterministic v1 that already covers the common cases:
+This is a heuristic rather than AST or data-flow analysis. It covers:
 endpoint path literals, dotted field access, enum string comparisons.
 """
 import os
@@ -15,10 +14,11 @@ from dataclasses import dataclass, asdict
 
 DEFAULT_EXTENSIONS = (".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs", ".py")
 EXCLUDED_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build"}
-SUPPORTED_BREAKING_KINDS = {
+SUPPORTED_ACTIONABLE_KINDS = {
     "endpoint_removed", "response_removed", "request_body_required",
     "request_parameter_required", "request_media_removed", "response_type_changed",
     "response_field_removed", "enum_value_removed", "request_required_added",
+    "response_schema_composition_changed",
 }
 
 
@@ -40,7 +40,7 @@ def _patterns_for(change):
     kind = change.kind
     path = change.path
 
-    if kind in ("endpoint_removed", "response_removed", "request_body_required",
+    if kind in ("endpoint_removed", "response_removed", "response_schema_composition_changed", "request_body_required",
                 "request_parameter_required", "request_media_removed", "request_required_added") or (
                     kind == "response_type_changed" and change.pointer.endswith((".$", ".[]"))):
         # template-literal `/v1/charges/${id}` and literal `/v1/charges/ch_123`
@@ -78,8 +78,8 @@ def scan_repo(repo_dir, changes, exts=DEFAULT_EXTENSIONS):
     if not os.path.isdir(repo_dir):
         raise ValueError(f"repository directory does not exist: {repo_dir}")
     sites = []
-    breaking = [c for c in changes if c.severity == "BREAKING"]
-    unsupported = sorted({c.kind for c in breaking} - SUPPORTED_BREAKING_KINDS)
+    breaking = [c for c in changes if c.severity in ("BREAKING", "REVIEW")]
+    unsupported = sorted({c.kind for c in breaking} - SUPPORTED_ACTIONABLE_KINDS)
     if unsupported:
         raise ValueError(f"unsupported breaking change kinds: {', '.join(unsupported)}")
     patterns = [(c, _patterns_for(c)) for c in breaking]

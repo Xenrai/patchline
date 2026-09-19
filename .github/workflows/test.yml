@@ -23,6 +23,8 @@ jobs:
       - run: python -m unittest discover tests -v
       - name: build installable wheel
         run: python -m pip wheel . --no-deps --wheel-dir dist
+      - name: verify installed wheel outside source checkout
+        run: python tests/wheel_smoke.py dist
 
       # The demo must always work exactly as the README documents it.
       # (exit code 1 = breaking changes found, which is the expected result here)

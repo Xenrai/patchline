@@ -25,16 +25,16 @@ def _cmd_diff(args):
     }
     s = report["summary"]
     print(f"{report['api']}: {report['old_version']} -> {report['new_version']}")
-    print(f"{s['total']} changes: {s['breaking']} BREAKING, {s['additive']} additive")
+    print(f"{s['total']} changes: {s['breaking']} BREAKING, {s['review']} review, {s['additive']} additive")
     print()
     for c in changes:
-        if c.severity == "BREAKING":
-            print(f"  [BREAKING] {c.kind:24s} {c.method.upper():5s} {c.path:40s} {c.detail}")
+        if c.severity in ("BREAKING", "REVIEW"):
+            print(f"  [{c.severity}] {c.kind:24s} {c.method.upper():5s} {c.path:40s} {c.detail}")
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         print(f"\nFull report written to {args.out}")
-    return 1 if s["breaking"] else 0  # exit code doubles as a CI signal
+    return 1 if s["breaking"] or s["review"] else 0
 
 
 def _cmd_scan(args):
@@ -53,12 +53,14 @@ def _cmd_scan(args):
         for field in ("kind", "severity", "path", "method", "detail", "pointer"):
             if not isinstance(getattr(change, field), str):
                 raise ValueError(f"change {i} field '{field}' must be a string")
-        if change.severity not in ("BREAKING", "ADDITIVE"):
+        if change.severity not in ("BREAKING", "REVIEW", "ADDITIVE"):
             raise ValueError(f"change {i} has invalid severity")
         changes.append(change)
     sites = scan_repo(args.repo, changes)
     breaking = [c for c in changes if c.severity == "BREAKING"]
-    print(f"{len(breaking)} breaking changes -> {len(sites)} affected call site(s) in {args.repo}")
+    review = sum(c.severity == "REVIEW" for c in changes)
+    review_label = f", {review} requiring review" if review else ""
+    print(f"{len(breaking)} breaking changes{review_label} -> {len(sites)} affected call site(s) in {args.repo}")
     print()
     for s_ in sites:
         print(f"  {s_.file}:{s_.line:<5} [{s_.change_kind}] {s_.code[:80]}")
@@ -73,7 +75,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="patchline",
         description="Diff API specs and find what breaks your code.")
+    from . import __version__
+    parser.add_argument("--version", action="version", version=f"patchline {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
+
+    from .demo import run_demo
+    demo = sub.add_parser("demo", help="run the bundled offline example; no clone or API key needed")
+    demo.set_defaults(fn=lambda args: run_demo())
 
     d = sub.add_parser("diff", help="diff two OpenAPI specs")
     d.add_argument("old_spec")
