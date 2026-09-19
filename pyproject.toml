@@ -4,12 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "patchline"
-version = "0.2.0"
+version = "0.3.0"
 description = "Diff API specs and find what breaks your code"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = []
+keywords = ["openapi", "api-diff", "breaking-changes", "static-analysis", "ci"]
+
+[project.urls]
+Repository = "https://github.com/Xenrai/patchline"
+Documentation = "https://github.com/Xenrai/patchline#readme"
+Issues = "https://github.com/Xenrai/patchline/issues"
+Changelog = "https://github.com/Xenrai/patchline/blob/main/CHANGELOG.md"
+
+[tool.setuptools.package-data]
+patchline = ["demo_data/*.json", "demo_data/*.js"]
 
 [tool.setuptools.packages.find]
 include = ["patchline*"]

@@ -7,14 +7,15 @@
     "v2349": "https://raw.githubusercontent.com/stripe/openapi/v2349/openapi/spec3.json"
   },
   "summary": {
-    "total": 6398,
-    "breaking": 18,
+    "total": 6385,
+    "breaking": 4,
+    "review": 1,
     "additive": 6380,
     "by_kind": {
       "endpoint_added": 2,
       "response_field_added": 6378,
-      "response_field_removed": 17,
-      "response_type_changed": 1
+      "response_field_removed": 4,
+      "response_schema_composition_changed": 1
     }
   },
   "changes": [
@@ -54109,144 +54110,23 @@
       "new": "string"
     },
     {
-      "kind": "response_type_changed",
-      "severity": "BREAKING",
+      "kind": "response_schema_composition_changed",
+      "severity": "REVIEW",
       "path": "/v1/terminal/readers/{reader}/cancel_action",
       "method": "post",
-      "detail": "Response 200 root type changed",
+      "detail": "Schema composition changed; manual compatibility review required",
       "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.$",
-      "old": "object",
-      "new": "any"
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'action' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.action",
-      "old": "any",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'device_sw_version' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.device_sw_version",
-      "old": "null|string",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'device_type' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.device_type",
-      "old": "string",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'id' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.id",
-      "old": "string",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'ip_address' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.ip_address",
-      "old": "null|string",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'label' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.label",
-      "old": "string",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'last_seen_at' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.last_seen_at",
-      "old": "integer|null",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'livemode' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.livemode",
-      "old": "boolean",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'location' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.location",
-      "old": "any",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'metadata' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.metadata",
-      "old": "object",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'object' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.object",
-      "old": "string",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'serial_number' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.serial_number",
-      "old": "string",
-      "new": null
-    },
-    {
-      "kind": "response_field_removed",
-      "severity": "BREAKING",
-      "path": "/v1/terminal/readers/{reader}/cancel_action",
-      "method": "post",
-      "detail": "Response field 'status' removed from POST /v1/terminal/readers/{reader}/cancel_action",
-      "pointer": "paths./v1/terminal/readers/{reader}/cancel_action.post.responses.200.status",
-      "old": "null|string",
-      "new": null
+      "old": null,
+      "new": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/terminal.reader"
+          },
+          {
+            "$ref": "#/components/schemas/deleted_terminal.reader"
+          }
+        ]
+      }
     },
     {
       "kind": "response_field_added",

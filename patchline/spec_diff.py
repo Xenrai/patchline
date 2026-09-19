@@ -9,6 +9,7 @@ Classification rules (deterministic):
              type changed | requestBody required property added | enum value removed
              | response removed | required body/parameter | request media removed
   ADDITIVE:  endpoint added | response added | response property added
+  REVIEW:    schema composition changed; compatibility is not established
 """
 import json
 import re
@@ -21,7 +22,7 @@ MAX_DEPTH = 5
 @dataclass
 class Change:
     kind: str
-    severity: str        # BREAKING | ADDITIVE
+    severity: str        # BREAKING | REVIEW | ADDITIVE
     path: str
     method: str
     detail: str
@@ -171,10 +172,49 @@ def _enums(spec, schema, prefix="", depth=0):
     return out
 
 
+def _compositions(spec, schema, prefix="", depth=0):
+    """Locate unsupported compositions without inventing field removals."""
+    if depth > MAX_DEPTH:
+        return {}
+    schema = _resolve(spec, schema)
+    composed = {key: schema[key] for key in ("allOf", "oneOf", "anyOf") if key in schema}
+    if composed:
+        return {prefix: composed}
+    found = {}
+    properties = schema.get("properties", {})
+    if isinstance(properties, dict):
+        for name, child in properties.items():
+            pointer = f"{prefix}.{name}" if prefix else name
+            found.update(_compositions(spec, child, pointer, depth + 1))
+    if "items" in schema:
+        found.update(_compositions(spec, schema["items"], prefix + "[]", depth + 1))
+    return found
+
+
 def _diff_response(old_spec, new_spec, old_schema, new_schema, path, method, base):
     changes = []
+    old_composed = _compositions(old_spec, old_schema)
+    new_composed = _compositions(new_spec, new_schema)
     old_props = _props(old_spec, old_schema)
     new_props = _props(new_spec, new_schema)
+    candidates = {p for p in old_composed.keys() | new_composed.keys()
+                  if not p or p in old_props and p in new_props}
+    blocked = {p for p in candidates if not any(
+        parent != p and (not parent or p.startswith((parent + ".", parent + "[]")))
+        for parent in candidates)}
+
+    def covered(pointer):
+        return not any(not p or pointer == p or pointer.startswith((p + ".", p + "[]")) for p in blocked)
+
+    for pointer in sorted(blocked):
+        if old_composed.get(pointer) != new_composed.get(pointer):
+            changes.append(Change(
+                kind="response_schema_composition_changed", severity="REVIEW", path=path, method=method,
+                detail="Schema composition changed; manual compatibility review required",
+                pointer=f"{base}.{pointer or '$'}", old=old_composed.get(pointer),
+                new=new_composed.get(pointer)))
+    old_props = {p: t for p, t in old_props.items() if covered(p)}
+    new_props = {p: t for p, t in new_props.items() if covered(p)}
     for ptr in sorted(old_props):
         if ptr not in new_props:
             changes.append(Change(
@@ -196,6 +236,8 @@ def _diff_response(old_spec, new_spec, old_schema, new_schema, path, method, bas
     old_enums = _enums(old_spec, old_schema)
     new_enums = _enums(new_spec, new_schema)
     for ptr, old_vals in sorted(old_enums.items()):
+        if not covered(ptr):
+            continue
         new_vals = new_enums.get(ptr)
         if new_vals is None:
             continue
@@ -250,7 +292,8 @@ def _parameters(spec, op):
 def diff_specs(old_spec, new_spec):
     """Compare supported OpenAPI contracts; raise ValueError for invalid input.
 
-    Changes retain the v1 report shape. Media types are included in pointers
+    Changes retain the original fields and add the REVIEW severity in v0.3.
+    Media types are included in pointers
     when more than one representation is present for a response status.
     """
     _validate_spec(old_spec)
@@ -284,7 +327,8 @@ def diff_specs(old_spec, new_spec):
                 add("response_added", response_base, f"Response {status} {media} added", severity="ADDITIVE")
                 continue
             old_schema, new_schema = old_variants[variant], new_variants[variant]
-            if _schema_type(old_schema) != _schema_type(new_schema):
+            composed_root = any(k in old_schema or k in new_schema for k in ("allOf", "oneOf", "anyOf"))
+            if not composed_root and _schema_type(old_schema) != _schema_type(new_schema):
                 add("response_type_changed", response_base + ".$",
                     f"Response {status} root type changed", _schema_type(old_schema),
                     _schema_type(new_schema))
@@ -333,6 +377,7 @@ def summarize(changes):
     return {
         "total": len(changes),
         "breaking": len(breaking),
+        "review": sum(c.severity == "REVIEW" for c in changes),
         "additive": len(additive),
         "by_kind": {k: sum(1 for c in changes if c.kind == k)
                     for k in sorted({c.kind for c in changes})},

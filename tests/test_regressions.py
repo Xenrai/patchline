@@ -25,6 +25,35 @@ def props(**fields):
 
 
 class ContractRegressions(unittest.TestCase):
+    def test_object_becoming_union_does_not_invent_field_removals(self):
+        old = spec(props(id={"type": "string"}, status={"type": "string"}))
+        new = spec({"anyOf": [props(id={"type": "string"}), props(deleted={"type": "boolean"})]})
+        changes = diff_specs(old, new)
+        self.assertEqual([c.kind for c in changes], ["response_schema_composition_changed"])
+        self.assertIn("manual compatibility review", changes[0].detail)
+        self.assertEqual(changes[0].severity, "REVIEW")
+
+    def test_new_composed_field_is_additive(self):
+        changes = diff_specs(spec(props()), spec(props(result={"oneOf": [{"type": "string"}]})))
+        self.assertEqual([c.kind for c in changes], ["response_field_added"])
+
+    def test_parent_composition_suppresses_nested_noise(self):
+        old = spec(props(result={"oneOf": [{"type": "string"}]}))
+        new = spec({"anyOf": [props(result={"type": "string"})]})
+        self.assertEqual(len(diff_specs(old, new)), 1)
+
+    def test_nested_composition_change_preserves_other_findings(self):
+        old = spec(props(result=props(id={"type": "string"}), extra={"type": "string"}))
+        new = spec(props(result={"oneOf": [props(id={"type": "string"})]}))
+        changes = diff_specs(old, new)
+        removed = [c.pointer for c in changes if c.kind == "response_field_removed"]
+        self.assertEqual(removed, ["paths./items.get.responses.200.extra"])
+        self.assertIn("response_schema_composition_changed", [c.kind for c in changes])
+
+    def test_unchanged_composition_does_not_create_findings(self):
+        value = spec({"allOf": [props(id={"type": "string"})]})
+        self.assertEqual(diff_specs(value, value), [])
+
     def test_all_response_statuses(self):
         for status in ("201", "204", "400", "2XX", "default"):
             with self.subTest(status=status):
@@ -198,6 +227,20 @@ class CliRegressions(unittest.TestCase):
                 self.assertEqual(result, 2)
                 self.assertIn("patchline: error:", err)
                 self.assertNotIn("Traceback", err)
+
+    def test_manual_review_fails_diff_gate_and_can_be_scanned(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            old, new, report = (root / name for name in ("old.json", "new.json", "report.json"))
+            old.write_text(json.dumps(spec(props(id={"type": "string"}))), encoding="utf-8")
+            new.write_text(json.dumps(spec({"anyOf": [props(id={"type": "string"})]})), encoding="utf-8")
+            (root / "client.py").write_text('client.get("/items")\n', encoding="utf-8")
+            status, out, _ = self.invoke(["diff", str(old), str(new), "--out", str(report)])
+            self.assertEqual(status, 1)
+            self.assertIn("0 BREAKING, 1 review", out)
+            parsed = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(parsed["changes"][0]["severity"], "REVIEW")
+            self.assertEqual(self.invoke(["scan", "--repo", temp, "--report", str(report)])[0], 1)
 
     def test_invalid_reports_return_two(self):
         with tempfile.TemporaryDirectory() as temp:
